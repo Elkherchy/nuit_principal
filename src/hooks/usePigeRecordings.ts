@@ -2,13 +2,16 @@
  * Hook pour gérer les enregistrements de pige
  */
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   startRecording as startRecordingService,
   fetchActiveJobs as fetchActiveJobsService,
   fetchRecordings as fetchRecordingsService,
   fetchRecordingDetails as fetchRecordingDetailsService,
   generateSummary as generateSummaryService,
+  stopJob as stopJobService,
+  deleteJob as deleteJobService,
+  cleanupJobs as cleanupJobsService,
   type StartRecordingParams,
   type ActiveJob,
   type Recording,
@@ -22,6 +25,9 @@ export const usePigeRecordings = () => {
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [selectedRecording, setSelectedRecording] =
     useState<RecordingDetails | null>(null);
+  const [backendError, setBackendError] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(false); // Désactivé par défaut pour ne pas surcharger
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   /**
    * Démarre un nouvel enregistrement
@@ -39,7 +45,17 @@ export const usePigeRecordings = () => {
       const data = await startRecordingService(params);
 
       if (data.success) {
-        setMessage(`✅ Enregistrement démarré ! Job ID: ${data.job_id}`);
+        // Différencier le message selon si le backend a répondu ou non
+        if (data.job_id) {
+          setMessage(`✅ Enregistrement démarré ! Job ID: ${data.job_id}`);
+        } else if (data.mongo_file_id) {
+          setMessage(
+            `✅ Fichier sauvegardé dans MongoDB ! ID: ${data.mongo_file_id}`
+          );
+        } else {
+          setMessage(`✅ Fichier uploadé avec succès !`);
+        }
+
         // Actualiser les jobs et enregistrements
         setTimeout(() => {
           fetchActiveJobs();
@@ -66,9 +82,23 @@ export const usePigeRecordings = () => {
     try {
       const data = await fetchActiveJobsService();
       setActiveJobs(data.jobs || []);
+      setBackendError(false);
+      // Effacer le message d'erreur si la requête réussit
+      if (message.includes("Backend inaccessible")) {
+        setMessage("");
+      }
       return data;
     } catch (error) {
       console.error("Erreur fetch jobs:", error);
+      // ⚠️ IMPORTANT: Vider les jobs si le backend est inaccessible
+      setActiveJobs([]);
+      setBackendError(true);
+      // Afficher un message d'information (pas d'erreur) pour ne pas alarmer
+      if (!message) {
+        setMessage(
+          "ℹ️ Backend inaccessible - Les jobs actifs ne peuvent pas être récupérés"
+        );
+      }
       return { count: 0, jobs: [] };
     }
   };
@@ -122,9 +152,114 @@ export const usePigeRecordings = () => {
   };
 
   /**
+   * Arrête un job en cours
+   */
+  const stopJob = async (jobId: number) => {
+    try {
+      const data = await stopJobService(jobId);
+      if (data.success) {
+        setMessage(`✅ Job #${jobId} arrêté avec succès !`);
+        // Rafraîchir la liste des jobs
+        await fetchActiveJobs();
+      } else {
+        setMessage(`❌ Erreur: ${data.message || "Échec de l'arrêt"}`);
+      }
+      return data;
+    } catch (error) {
+      const errorMessage = `❌ Erreur arrêt du job: ${error}`;
+      setMessage(errorMessage);
+      return { success: false, message: errorMessage };
+    }
+  };
+
+  /**
+   * Supprime un job
+   */
+  const deleteJob = async (jobId: number) => {
+    try {
+      const data = await deleteJobService(jobId);
+      if (data.success) {
+        setMessage(`✅ Job #${jobId} supprimé avec succès !`);
+        // Rafraîchir la liste des jobs
+        await fetchActiveJobs();
+      } else {
+        setMessage(`❌ Erreur: ${data.message || "Échec de la suppression"}`);
+      }
+      return data;
+    } catch (error) {
+      const errorMessage = `❌ Erreur suppression du job: ${error}`;
+      setMessage(errorMessage);
+      return { success: false, message: errorMessage };
+    }
+  };
+
+  /**
+   * Nettoie tous les jobs obsolètes
+   */
+  const cleanupJobs = async () => {
+    setLoading(true);
+    try {
+      const data = await cleanupJobsService();
+      if (data.success) {
+        setMessage(`✅ ${data.updated_count || 0} job(s) nettoyé(s) avec succès !`);
+        // Rafraîchir la liste des jobs
+        await fetchActiveJobs();
+        await fetchRecordings();
+      } else {
+        setMessage(`❌ Erreur: ${data.message || "Échec du nettoyage"}`);
+      }
+      return data;
+    } catch (error) {
+      const errorMessage = `❌ Erreur nettoyage des jobs: ${error}`;
+      setMessage(errorMessage);
+      return { success: false, message: errorMessage };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
    * Réinitialise le message
    */
   const clearMessage = () => setMessage("");
+
+  /**
+   * Active/désactive le rafraîchissement automatique
+   */
+  const toggleAutoRefresh = () => setAutoRefresh((prev) => !prev);
+
+  /**
+   * Rafraîchissement automatique des jobs et enregistrements
+   * Polling toutes les 15 secondes si autoRefresh est activé
+   */
+  useEffect(() => {
+    if (!autoRefresh) {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+      return;
+    }
+
+    // Faire un premier fetch immédiatement
+    fetchActiveJobs();
+    fetchRecordings();
+
+    // Puis configurer le polling (5 secondes pour détecter rapidement les jobs terminés)
+    pollingIntervalRef.current = setInterval(() => {
+      fetchActiveJobs(); // Mise à jour automatique des jobs (le backend vérifie les PIDs)
+      fetchRecordings(); // Rafraîchir les enregistrements pour voir les nouveaux
+    }, 5000); // Toutes les 5 secondes
+
+    // Cleanup
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRefresh]); // Relancer si autoRefresh change
 
   return {
     // État
@@ -133,6 +268,8 @@ export const usePigeRecordings = () => {
     activeJobs,
     recordings,
     selectedRecording,
+    backendError,
+    autoRefresh,
 
     // Actions
     startRecording,
@@ -140,8 +277,11 @@ export const usePigeRecordings = () => {
     fetchRecordings,
     fetchRecordingDetails,
     generateSummary,
+    stopJob,
+    deleteJob,
+    cleanupJobs,
     clearMessage,
     setSelectedRecording,
+    toggleAutoRefresh,
   };
 };
-

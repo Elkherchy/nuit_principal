@@ -40,6 +40,10 @@ export interface StartRecordingResponse {
   process_id?: number;
   output_path?: string;
   message?: string;
+  mongo_file_id?: string;
+  mongo_url?: string;
+  local_url?: string;
+  warning?: string;
 }
 
 export interface ActiveJob {
@@ -61,6 +65,8 @@ export interface Recording {
   created_at: string;
   filename?: string;
   format?: string;
+  has_summary?: boolean; // Indique si un résumé IA est disponible
+  has_transcript?: boolean; // Indique si une transcription est disponible
 }
 
 export interface BlankAlert {
@@ -170,6 +176,71 @@ export const fetchActiveJobs = async (): Promise<{
 };
 
 /**
+ * Arrête un job en cours
+ */
+export const stopJob = async (
+  jobId: number
+): Promise<{ success: boolean; message?: string }> => {
+  const response = await fetch(
+    `${API_BASE}/api/recordings/jobs/${jobId}/stop/`,
+    {
+      method: "POST",
+    }
+  );
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(
+      `Erreur HTTP ${response.status}: ${text.substring(0, 100)}`
+    );
+  }
+
+  return response.json();
+};
+
+/**
+ * Supprime un job
+ */
+export const deleteJob = async (
+  jobId: number
+): Promise<{ success: boolean; message?: string }> => {
+  const response = await fetch(`${API_BASE}/api/recordings/jobs/${jobId}/`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(
+      `Erreur HTTP ${response.status}: ${text.substring(0, 100)}`
+    );
+  }
+
+  return response.json();
+};
+
+/**
+ * Nettoie tous les jobs obsolètes (processus terminés)
+ */
+export const cleanupJobs = async (): Promise<{
+  success: boolean;
+  updated_count?: number;
+  message?: string;
+}> => {
+  const response = await fetch(`${API_BASE}/api/recordings/jobs/cleanup/`, {
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(
+      `Erreur HTTP ${response.status}: ${text.substring(0, 100)}`
+    );
+  }
+
+  return response.json();
+};
+
+/**
  * Récupère la liste des enregistrements
  */
 export const fetchRecordings = async (): Promise<{
@@ -213,7 +284,9 @@ export const generateSummary = async (
   recordingId: number,
   maxSentences = 5
 ): Promise<{ success: boolean; summary?: string; message?: string }> => {
-  const response = await fetch(`${API_BASE}/api/ai/summarize/`, {
+  // Utiliser la route API locale Next.js qui sert de proxy
+  const endpoint = "/api/ai/summarize";
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -223,10 +296,10 @@ export const generateSummary = async (
   });
 
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(
-      `Erreur HTTP ${response.status}: ${text.substring(0, 100)}`
-    );
+    const errorData = await response
+      .json()
+      .catch(() => ({ message: "Erreur inconnue" }));
+    throw new Error(errorData.message || `Erreur HTTP ${response.status}`);
   }
 
   return response.json();

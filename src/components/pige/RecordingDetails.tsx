@@ -4,7 +4,8 @@
 
 "use client";
 
-import { AlertCircle } from "lucide-react";
+import { useState } from "react";
+import { AlertCircle, Sparkles, Loader2, RefreshCw } from "lucide-react";
 import type { RecordingDetails as RecordingDetailsType } from "@/services/pigeService";
 import { formatBytes } from "@/lib/pigeFormatters";
 
@@ -17,6 +18,18 @@ export const RecordingDetails = ({
   recording,
   onGenerateSummary,
 }: RecordingDetailsProps) => {
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+
+  const handleGenerateSummary = async () => {
+    setIsGeneratingSummary(true);
+    try {
+      await onGenerateSummary(recording.id);
+    } finally {
+      // Attendre un peu avant de désactiver le loader pour un meilleur feedback
+      setTimeout(() => setIsGeneratingSummary(false), 500);
+    }
+  };
+
   return (
     <div className="bg-slate-900 border border-slate-700 rounded-lg p-6">
       <h2 className="text-2xl font-semibold text-emerald-300 mb-4">
@@ -44,31 +57,90 @@ export const RecordingDetails = ({
         </div>
       </div>
 
+      {/* Section Transcription */}
       {recording.transcript && (
-        <div className="bg-slate-800 p-4 rounded mb-4">
-          <h3 className="font-semibold text-emerald-300 mb-2">Transcription</h3>
-          <p className="text-sm text-slate-300 whitespace-pre-wrap">
-            {recording.transcript}
-          </p>
+        <div className="bg-slate-800 border border-slate-700 p-5 rounded-lg mb-4">
+          <h3 className="font-semibold text-emerald-300 mb-3 text-lg">📝 Transcription complète</h3>
+          <div className="bg-slate-900/50 p-4 rounded-lg max-h-96 overflow-y-auto">
+            <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">
+              {recording.transcript}
+            </p>
+          </div>
         </div>
       )}
 
+      {/* Section Résumé IA */}
       {recording.summary && (
-        <div className="bg-slate-800 p-4 rounded mb-4">
-          <h3 className="font-semibold text-emerald-300 mb-2">Résumé IA</h3>
-          <p className="text-sm text-slate-300 whitespace-pre-wrap">
-            {recording.summary}
-          </p>
+        <div className="bg-gradient-to-br from-blue-900/30 to-purple-900/30 border border-blue-700/50 p-6 rounded-lg mb-4 relative overflow-hidden">
+          {/* Badge AI */}
+          <div className="absolute top-2 right-2 flex items-center gap-1 bg-blue-600/80 px-2 py-1 rounded-full text-xs font-semibold backdrop-blur-sm">
+            <Sparkles className="h-3 w-3" />
+            <span>AI</span>
+          </div>
+
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles className="h-5 w-5 text-blue-400" />
+            <h3 className="font-semibold text-blue-300 text-lg">Résumé IA</h3>
+          </div>
+
+          <div className="bg-slate-900/50 p-4 rounded-lg mb-3 backdrop-blur-sm">
+            <p className="text-slate-200 leading-relaxed whitespace-pre-wrap">
+              {recording.summary}
+            </p>
+          </div>
+
+          {/* Bouton de régénération */}
+          <button
+            type="button"
+            onClick={handleGenerateSummary}
+            disabled={isGeneratingSummary}
+            className="flex items-center gap-2 text-sm text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isGeneratingSummary ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Régénération en cours...</span>
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4" />
+                <span>Régénérer le résumé</span>
+              </>
+            )}
+          </button>
         </div>
       )}
 
-      {!recording.summary && recording.status === "completed" && (
+      {/* Bouton pour générer le résumé initial */}
+      {!recording.summary && recording.transcript && recording.status === "completed" && (
         <button
-          onClick={() => onGenerateSummary(recording.id)}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded mb-4"
+          type="button"
+          onClick={handleGenerateSummary}
+          disabled={isGeneratingSummary}
+          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-slate-700 disabled:to-slate-700 text-white font-semibold py-4 px-6 rounded-lg mb-4 flex items-center justify-center gap-3 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:hover:scale-100 shadow-lg hover:shadow-blue-500/50"
         >
-          Générer un résumé IA
+          {isGeneratingSummary ? (
+            <>
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span>Génération du résumé IA en cours...</span>
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-5 w-5" />
+              <span>Générer un résumé IA</span>
+            </>
+          )}
         </button>
+      )}
+
+      {/* Message si pas de transcription disponible */}
+      {!recording.summary && !recording.transcript && recording.status === "completed" && (
+        <div className="bg-yellow-900/20 border border-yellow-700/50 p-4 rounded-lg mb-4">
+          <p className="text-yellow-400 text-sm flex items-center gap-2">
+            <AlertCircle className="h-4 w-4" />
+            <span>Aucune transcription disponible. Le résumé IA nécessite d'abord une transcription de l'enregistrement.</span>
+          </p>
+        </div>
       )}
 
       {recording.blank_alerts && recording.blank_alerts.length > 0 && (

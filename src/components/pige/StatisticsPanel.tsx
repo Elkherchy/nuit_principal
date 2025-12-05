@@ -18,6 +18,25 @@ interface StatisticsPanelProps {
 }
 
 export const StatisticsPanel = ({ statistics }: StatisticsPanelProps) => {
+  // Afficher un message si aucune statistique
+  if (!statistics || statistics.total_recordings === 0) {
+    return (
+      <div className="bg-slate-900 border border-slate-700 rounded-lg p-6">
+        <h2 className="text-2xl font-semibold text-emerald-300 mb-6 flex items-center gap-2">
+          <TrendingUp className="h-6 w-6" />
+          Statistiques globales
+        </h2>
+        <div className="text-center py-8">
+          <TrendingUp className="h-16 w-16 text-slate-600 mx-auto mb-3" />
+          <p className="text-slate-400 text-lg">Aucune statistique disponible</p>
+          <p className="text-slate-500 text-sm mt-2">
+            Les statistiques apparaîtront une fois que vous aurez des enregistrements
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-slate-900 border border-slate-700 rounded-lg p-6">
       <h2 className="text-2xl font-semibold text-emerald-300 mb-6 flex items-center gap-2">
