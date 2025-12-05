@@ -163,16 +163,61 @@ export const fetchActiveJobs = async (): Promise<{
   count: number;
   jobs: ActiveJob[];
 }> => {
-  const response = await fetch(`${API_BASE}/api/recordings/jobs/active/`);
+  const endpoint = `${API_BASE}/api/recordings/jobs/active/`;
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(
-      `Erreur HTTP ${response.status}: ${text.substring(0, 100)}`
-    );
+  try {
+    console.log(`🔍 Récupération des jobs actifs depuis: ${endpoint}`);
+
+    const response = await fetch(endpoint, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      // Timeout de 10 secondes pour éviter les blocages
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.error(
+        `❌ Erreur HTTP ${response.status}:`,
+        text.substring(0, 200)
+      );
+      throw new Error(
+        `Erreur HTTP ${response.status}: ${text.substring(0, 100)}`
+      );
+    }
+
+    const data = await response.json();
+
+    // Validation de la réponse
+    if (!data || typeof data !== "object") {
+      throw new Error("Réponse invalide du serveur");
+    }
+
+    console.log(`✅ Jobs actifs récupérés: ${data.count || 0}`, data.jobs);
+
+    return {
+      count: data.count || 0,
+      jobs: Array.isArray(data.jobs) ? data.jobs : [],
+    };
+  } catch (error) {
+    // Gérer les erreurs de timeout
+    if (error instanceof Error && error.name === "TimeoutError") {
+      console.error("⏱️ Timeout lors de la récupération des jobs actifs");
+      throw new Error("Le serveur met trop de temps à répondre");
+    }
+
+    // Gérer les erreurs réseau
+    if (error instanceof TypeError) {
+      console.error("🌐 Erreur réseau:", error.message);
+      throw new Error("Impossible de contacter le serveur");
+    }
+
+    // Autres erreurs
+    console.error("❌ Erreur inattendue:", error);
+    throw error;
   }
-
-  return response.json();
 };
 
 /**

@@ -132,11 +132,26 @@ export const ActiveJobsList = ({
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <p className="font-semibold text-white">Job #{job.id}</p>
-                    <p className="text-sm text-slate-400">{job.output}</p>
-                    <p className="text-xs text-slate-500">
-                      Format: {job.format} • PID: {job.process_id}
+                    <p className="font-semibold text-white flex items-center gap-2">
+                      Job #{job.id}
+                      <span className="text-xs px-2 py-0.5 bg-emerald-600 rounded-full">
+                        {job.format.toUpperCase()}
+                      </span>
                     </p>
+                    <p className="text-sm text-slate-400 mt-1">{job.output}</p>
+                    <div className="flex gap-3 text-xs text-slate-500 mt-1">
+                      <span>🔢 PID: {job.process_id}</span>
+                      {job.started_at && (
+                        <span>
+                          🕐 Démarré: {new Date(job.started_at).toLocaleTimeString("fr-FR")}
+                        </span>
+                      )}
+                    </div>
+                    {job.source && (
+                      <p className="text-xs text-slate-600 mt-1 truncate" title={job.source}>
+                        📡 Source: {job.source}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="animate-pulse flex items-center gap-2 text-emerald-400">

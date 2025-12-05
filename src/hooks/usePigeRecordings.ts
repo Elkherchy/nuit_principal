@@ -56,11 +56,28 @@ export const usePigeRecordings = () => {
           setMessage(`✅ Fichier uploadé avec succès !`);
         }
 
-        // Actualiser les jobs et enregistrements
+        // ✨ IMPORTANT: Rafraîchir immédiatement les jobs actifs
+        // Si un job_id est retourné, c'est un job backend qu'on doit tracker
+        if (data.job_id) {
+          // Rafraîchir immédiatement
+          await fetchActiveJobs();
+          
+          // Puis rafraîchir périodiquement pendant 10 secondes pour être sûr de voir le job
+          let refreshCount = 0;
+          const maxRefresh = 5;
+          const refreshInterval = setInterval(async () => {
+            refreshCount++;
+            await fetchActiveJobs();
+            if (refreshCount >= maxRefresh) {
+              clearInterval(refreshInterval);
+            }
+          }, 2000); // Toutes les 2 secondes pendant 10 secondes
+        }
+
+        // Rafraîchir la liste des enregistrements après un délai
         setTimeout(() => {
-          fetchActiveJobs();
           fetchRecordings();
-        }, 1000);
+        }, 2000);
       } else {
         setMessage(`❌ Erreur: ${data.message || "Échec du démarrage"}`);
       }
@@ -81,24 +98,44 @@ export const usePigeRecordings = () => {
   const fetchActiveJobs = async () => {
     try {
       const data = await fetchActiveJobsService();
+      
+      // Vérifier que la réponse est valide
+      if (!data || typeof data !== 'object') {
+        throw new Error("Réponse invalide du serveur");
+      }
+
       setActiveJobs(data.jobs || []);
       setBackendError(false);
+      
       // Effacer le message d'erreur si la requête réussit
-      if (message.includes("Backend inaccessible")) {
+      if (message.includes("Backend inaccessible") || message.includes("Jobs actifs ne peuvent pas")) {
         setMessage("");
       }
+      
+      // Log pour debug
+      console.log(`✅ Jobs actifs récupérés: ${data.count || 0} job(s)`, data.jobs);
+      
       return data;
     } catch (error) {
-      console.error("Erreur fetch jobs:", error);
-      // ⚠️ IMPORTANT: Vider les jobs si le backend est inaccessible
-      setActiveJobs([]);
-      setBackendError(true);
-      // Afficher un message d'information (pas d'erreur) pour ne pas alarmer
-      if (!message) {
-        setMessage(
-          "ℹ️ Backend inaccessible - Les jobs actifs ne peuvent pas être récupérés"
-        );
+      console.error("❌ Erreur fetch jobs:", error);
+      
+      // Ne vider les jobs que si on a vraiment une erreur réseau
+      // Cela évite de perdre l'affichage en cas d'erreur temporaire
+      const isNetworkError = error instanceof TypeError && 
+                            (error.message.includes("fetch") || error.message.includes("network"));
+      
+      if (isNetworkError) {
+        setActiveJobs([]);
+        setBackendError(true);
+        
+        // N'afficher le message que si on n'en a pas déjà un
+        if (!message || message.includes("✅")) {
+          setMessage(
+            "⚠️ Impossible de contacter le serveur backend. Les jobs actifs ne peuvent pas être récupérés."
+          );
+        }
       }
+      
       return { count: 0, jobs: [] };
     }
   };
