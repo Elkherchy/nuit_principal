@@ -16,7 +16,7 @@
     "highcharts-react-official": "^3.2.3",
     "jspdf": "^2.5.2",
     "lucide-react": "^0.555.0",
-    "mongoose": "^8.8.4",
+    "mongoose": "^9.0.0",
     "mongose": "^0.0.2-security",
     "nanoid": "^5.1.6",
     "next": "16.0.6",
