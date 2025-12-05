@@ -60,10 +60,10 @@ export const RecordingForm = ({ onSubmit, loading, message }: RecordingFormProps
             value={streamUrl}
             onChange={(e) => setStreamUrl(e.target.value)}
             className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
-            placeholder="Ex: http://icecast.radiofrance.fr/franceinter-midfi.mp3"
+            placeholder="Ex: https://icecast.radiofrance.fr/franceinter-midfi.mp"
           />
           <p className="text-xs text-slate-500 mt-1">
-            💡 Exemple: http://stream.example.com/radio.mp3
+            💡 Exemple: https://icecast.radiofrance.fr/franceinter-midfi.mp
           </p>
         </div>
 
@@ -151,14 +151,14 @@ export const RecordingForm = ({ onSubmit, loading, message }: RecordingFormProps
           📻 Exemples de streams radio français
         </summary>
         <ul className="mt-2 space-y-1 pl-4 text-xs">
-          <li className="cursor-pointer hover:text-emerald-400 transition-colors" onClick={() => setStreamUrl("http://icecast.radiofrance.fr/franceinter-midfi.mp3")}>
-            • France Inter: http://icecast.radiofrance.fr/franceinter-midfi.mp3
+          <li className="cursor-pointer hover:text-emerald-400 transition-colors" onClick={() => setStreamUrl("https://icecast.radiofrance.fr/franceinter-midfi.mp")}>
+            • France Inter: https://icecast.radiofrance.fr/franceinter-midfi.mp
           </li>
-          <li className="cursor-pointer hover:text-emerald-400 transition-colors" onClick={() => setStreamUrl("http://icecast.radiofrance.fr/franceinfo-midfi.mp3")}>
-            • France Info: http://icecast.radiofrance.fr/franceinfo-midfi.mp3
+          <li className="cursor-pointer hover:text-emerald-400 transition-colors" onClick={() => setStreamUrl("https://icecast.radiofrance.fr/franceinter-midfi.mp")}>
+            • France Info: https://icecast.radiofrance.fr/franceinter-midfi.mp
           </li>
-          <li className="cursor-pointer hover:text-emerald-400 transition-colors" onClick={() => setStreamUrl("http://icecast.radiofrance.fr/franceculture-midfi.mp3")}>
-            • France Culture: http://icecast.radiofrance.fr/franceculture-midfi.mp3
+          <li className="cursor-pointer hover:text-emerald-400 transition-colors" onClick={() => setStreamUrl("https://icecast.radiofrance.fr/franceinter-midfi.mp")}>
+            • France Culture: https://icecast.radiofrance.fr/franceinter-midfi.mp
           </li>
         </ul>
       </details>
