@@ -2,10 +2,10 @@
  * Service API pour le système de pige radio
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://91.98.158.148";
 
 export interface StartRecordingParams {
-  source: string;
+  source: string | File;
   title: string;
   format: string;
   duration: number;
@@ -92,6 +92,23 @@ export interface Statistics {
 export const startRecording = async (
   params: StartRecordingParams
 ): Promise<StartRecordingResponse> => {
+  // Si la source est un fichier, on utilise FormData pour l'upload
+  if (params.source instanceof File) {
+    const formData = new FormData();
+    formData.append("audio_file", params.source);
+    formData.append("title", params.title);
+    formData.append("format", params.format);
+    formData.append("duration", params.duration.toString());
+
+    const response = await fetch(`${API_BASE}/api/recordings/upload/`, {
+      method: "POST",
+      body: formData,
+    });
+
+    return response.json();
+  }
+
+  // Sinon, on utilise l'ancienne méthode avec URL
   const response = await fetch(`${API_BASE}/api/recordings/jobs/start/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -143,7 +160,10 @@ export const generateSummary = async (
   const response = await fetch(`${API_BASE}/api/ai/summarize/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ recording_id: recordingId, max_sentences: maxSentences }),
+    body: JSON.stringify({
+      recording_id: recordingId,
+      max_sentences: maxSentences,
+    }),
   });
 
   return response.json();
@@ -153,7 +173,9 @@ export const generateSummary = async (
  * Récupère les statistiques globales
  */
 export const fetchStatistics = async (): Promise<Statistics> => {
-  const response = await fetch(`${API_BASE}/api/archive/recordings/statistics/`);
+  const response = await fetch(
+    `${API_BASE}/api/archive/recordings/statistics/`
+  );
   return response.json();
 };
 
@@ -163,4 +185,3 @@ export const fetchStatistics = async (): Promise<Statistics> => {
 export const getDownloadUrl = (recordingId: number): string => {
   return `${API_BASE}/api/archive/recordings/${recordingId}/download/`;
 };
-
