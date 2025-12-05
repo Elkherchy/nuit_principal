@@ -14,18 +14,21 @@ import {
 } from "./StatisticsCharts";
 
 interface StatisticsPanelProps {
-  statistics: Statistics;
+  statistics: Statistics | null;
+  showHeader?: boolean;
 }
 
-export const StatisticsPanel = ({ statistics }: StatisticsPanelProps) => {
+export const StatisticsPanel = ({ statistics, showHeader = true }: StatisticsPanelProps) => {
   // Afficher un message si aucune statistique
   if (!statistics || statistics.total_recordings === 0) {
     return (
-      <div className="bg-slate-900 border border-slate-700 rounded-lg p-6">
-        <h2 className="text-2xl font-semibold text-emerald-300 mb-6 flex items-center gap-2">
-          <TrendingUp className="h-6 w-6" />
-          Statistiques globales
-        </h2>
+      <div className={showHeader ? "bg-slate-900 border border-slate-700 rounded-lg p-6" : ""}>
+        {showHeader && (
+          <h2 className="text-2xl font-semibold text-emerald-300 mb-6 flex items-center gap-2">
+            <TrendingUp className="h-6 w-6" />
+            Statistiques globales
+          </h2>
+        )}
         <div className="text-center py-8">
           <TrendingUp className="h-16 w-16 text-slate-600 mx-auto mb-3" />
           <p className="text-slate-400 text-lg">Aucune statistique disponible</p>
@@ -38,11 +41,13 @@ export const StatisticsPanel = ({ statistics }: StatisticsPanelProps) => {
   }
 
   return (
-    <div className="bg-slate-900 border border-slate-700 rounded-lg p-6">
-      <h2 className="text-2xl font-semibold text-emerald-300 mb-6 flex items-center gap-2">
-        <TrendingUp className="h-6 w-6" />
-        Statistiques globales
-      </h2>
+    <div className={showHeader ? "bg-slate-900 border border-slate-700 rounded-lg p-6" : ""}>
+      {showHeader && (
+        <h2 className="text-2xl font-semibold text-emerald-300 mb-6 flex items-center gap-2">
+          <TrendingUp className="h-6 w-6" />
+          Statistiques globales
+        </h2>
+      )}
 
       {/* Cartes de statistiques */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -97,4 +102,3 @@ export const StatisticsPanel = ({ statistics }: StatisticsPanelProps) => {
     </div>
   );
 };
-

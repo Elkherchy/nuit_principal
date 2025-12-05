@@ -45,15 +45,13 @@ export const usePigeRecordings = () => {
       const data = await startRecordingService(params);
 
       if (data.success) {
-        // Différencier le message selon si le backend a répondu ou non
+        // Différencier le message selon la réponse du backend
         if (data.job_id) {
           setMessage(`✅ Enregistrement démarré ! Job ID: ${data.job_id}`);
-        } else if (data.mongo_file_id) {
-          setMessage(
-            `✅ Fichier sauvegardé dans MongoDB ! ID: ${data.mongo_file_id}`
-          );
+        } else if (data.recording_id) {
+          setMessage(`✅ Enregistrement créé ! ID: ${data.recording_id}`);
         } else {
-          setMessage(`✅ Fichier uploadé avec succès !`);
+          setMessage(`✅ Enregistrement démarré avec succès !`);
         }
 
         // ✨ IMPORTANT: Rafraîchir immédiatement les jobs actifs
@@ -74,10 +72,62 @@ export const usePigeRecordings = () => {
           }, 2000); // Toutes les 2 secondes pendant 10 secondes
         }
 
-        // Rafraîchir la liste des enregistrements après un délai
-        setTimeout(() => {
-          fetchRecordings();
-        }, 2000);
+        // 🔄 Rafraîchissement automatique agressif après upload
+        // Essayer de récupérer le nouvel enregistrement plusieurs fois
+        let attemptCount = 0;
+        const maxAttempts = 10; // Essayer pendant 30 secondes
+        const attemptInterval = 3000; // Toutes les 3 secondes
+        
+        const refreshAndSelect = async () => {
+          attemptCount++;
+          console.log(`🔍 Tentative ${attemptCount}/${maxAttempts} de récupération de l'enregistrement...`);
+          
+          const recordingsData = await fetchRecordings();
+          
+          // Si on a un recording_id du backend, le sélectionner
+          if (data.recording_id) {
+            console.log(`✅ Recording ID trouvé: ${data.recording_id}`);
+            await fetchRecordingDetails(data.recording_id);
+            return true; // Succès
+          }
+          
+          // Sinon, chercher le dernier enregistrement qui correspond au titre
+          if (recordingsData && recordingsData.results && recordingsData.results.length > 0) {
+            // Chercher un enregistrement avec le même titre créé récemment
+            const recentRecording = recordingsData.results.find(
+              (rec) => rec.title === params.title
+            ) || recordingsData.results[0]; // Fallback au plus récent
+            
+            if (recentRecording) {
+              console.log(`✅ Enregistrement trouvé: ${recentRecording.title} (ID: ${recentRecording.id})`);
+              await fetchRecordingDetails(recentRecording.id);
+              return true; // Succès
+            }
+          }
+          
+          return false; // Pas encore trouvé
+        };
+        
+        // Première tentative immédiate
+        setTimeout(async () => {
+          const found = await refreshAndSelect();
+          
+          // Si pas trouvé, continuer à essayer
+          if (!found && attemptCount < maxAttempts) {
+            const retryInterval = setInterval(async () => {
+              const success = await refreshAndSelect();
+              
+              // Arrêter si trouvé ou si max tentatives atteint
+              if (success || attemptCount >= maxAttempts) {
+                clearInterval(retryInterval);
+                if (!success) {
+                  console.warn(`⚠️ Impossible de trouver l'enregistrement après ${maxAttempts} tentatives`);
+                  setMessage(`⚠️ Enregistrement sauvegardé mais non visible. Rafraîchissez la page.`);
+                }
+              }
+            }, attemptInterval);
+          }
+        }, 2000); // Première tentative après 2 secondes
       } else {
         setMessage(`❌ Erreur: ${data.message || "Échec du démarrage"}`);
       }
@@ -156,11 +206,89 @@ export const usePigeRecordings = () => {
 
   /**
    * Récupère les détails d'un enregistrement
+   * Avec génération automatique du résumé IA si nécessaire
    */
-  const fetchRecordingDetails = async (id: number) => {
+  const fetchRecordingDetails = async (id: number, autoGenerateSummary = true) => {
     try {
       const data = await fetchRecordingDetailsService(id);
       setSelectedRecording(data);
+      
+      // ✨ GÉNÉRATION AUTOMATIQUE DU RÉSUMÉ
+      // Si l'enregistrement a une transcription mais pas de résumé, générer automatiquement
+      if (autoGenerateSummary && data.status === "completed" && data.transcript && !data.summary) {
+        console.log(`✨ Génération automatique du résumé pour l'enregistrement ${id}...`);
+        
+        // Générer le résumé automatiquement
+        setTimeout(async () => {
+          try {
+            const summaryResult = await generateSummaryService(id, 5); // 5 phrases max
+            
+            if (summaryResult.success) {
+              console.log(`✅ Résumé généré automatiquement !`);
+              setMessage("✅ Résumé IA généré automatiquement !");
+              
+              // Rafraîchir les détails pour afficher le résumé
+              const updatedData = await fetchRecordingDetailsService(id);
+              setSelectedRecording(updatedData);
+            } else {
+              console.warn(`⚠️ Échec de la génération automatique:`, summaryResult.message);
+            }
+          } catch (error) {
+            console.error("❌ Erreur génération automatique:", error);
+          }
+        }, 1000); // Attendre 1 seconde avant de générer
+      }
+      
+      // 🔄 Si l'enregistrement n'a ni transcription ni résumé
+      // Rafraîchir automatiquement pour attendre le traitement backend
+      if (autoGenerateSummary && data.status === "completed") {
+        const needsProcessing = !data.transcript && !data.summary;
+        
+        if (needsProcessing) {
+          console.log(`🔄 Enregistrement ${id} en attente de traitement backend...`);
+          
+          let refreshAttempts = 0;
+          const maxRefreshAttempts = 6; // 6 * 5s = 30 secondes
+          
+          const refreshInterval = setInterval(async () => {
+            refreshAttempts++;
+            console.log(`🔄 Tentative ${refreshAttempts}/${maxRefreshAttempts} de rafraîchissement...`);
+            
+            try {
+              const updatedData = await fetchRecordingDetailsService(id);
+              setSelectedRecording(updatedData);
+              
+              // Si on a maintenant la transcription, arrêter et générer le résumé
+              if (updatedData.transcript) {
+                console.log(`✅ Transcription récupérée ! Génération du résumé...`);
+                clearInterval(refreshInterval);
+                
+                // Générer le résumé automatiquement
+                try {
+                  const summaryResult = await generateSummaryService(id, 5);
+                  if (summaryResult.success) {
+                    const finalData = await fetchRecordingDetailsService(id);
+                    setSelectedRecording(finalData);
+                    setMessage("✅ Analyse IA complète générée automatiquement !");
+                  }
+                } catch (error) {
+                  console.error("Erreur génération résumé:", error);
+                }
+              }
+              
+              // Arrêter après max tentatives
+              if (refreshAttempts >= maxRefreshAttempts) {
+                console.log(`⏸️ Arrêt du rafraîchissement après ${maxRefreshAttempts} tentatives`);
+                clearInterval(refreshInterval);
+              }
+            } catch (error) {
+              console.error("Erreur lors du rafraîchissement:", error);
+              clearInterval(refreshInterval);
+            }
+          }, 5000); // Toutes les 5 secondes
+        }
+      }
+      
       return data;
     } catch (error) {
       console.error("Erreur fetch details:", error);
@@ -256,6 +384,35 @@ export const usePigeRecordings = () => {
   };
 
   /**
+   * Supprime un enregistrement
+   */
+  const deleteRecording = async (recordingId: number) => {
+    setLoading(true);
+    try {
+      const { deleteRecording: deleteRecordingService } = await import("@/services/pigeService");
+      const data = await deleteRecordingService(recordingId);
+      
+      if (data.success) {
+        setMessage(`✅ Enregistrement #${recordingId} supprimé avec succès !`);
+        // Rafraîchir la liste et effacer la sélection si c'est l'enregistrement actuel
+        if (selectedRecording?.id === recordingId) {
+          setSelectedRecording(null);
+        }
+        await fetchRecordings();
+      } else {
+        setMessage(`❌ Erreur: ${data.message || "Échec de la suppression"}`);
+      }
+      return data;
+    } catch (error) {
+      const errorMessage = `❌ Erreur suppression: ${error}`;
+      setMessage(errorMessage);
+      return { success: false, message: errorMessage };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
    * Réinitialise le message
    */
   const clearMessage = () => setMessage("");
@@ -314,6 +471,7 @@ export const usePigeRecordings = () => {
     fetchRecordings,
     fetchRecordingDetails,
     generateSummary,
+    deleteRecording,
     stopJob,
     deleteJob,
     cleanupJobs,

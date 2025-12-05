@@ -12,9 +12,9 @@ interface ActiveJobsListProps {
   jobs: ActiveJob[];
   error?: boolean;
   errorMessage?: string;
-  onStopJob?: (jobId: number) => Promise<void>;
-  onDeleteJob?: (jobId: number) => Promise<void>;
-  onCleanupJobs?: () => Promise<void>;
+  onStopJob?: (jobId: number) => Promise<{ success: boolean; message?: string }>;
+  onDeleteJob?: (jobId: number) => Promise<{ success: boolean; message?: string }>;
+  onCleanupJobs?: () => Promise<{ success: boolean; updated_count?: number; message?: string }>;
 }
 
 export const ActiveJobsList = ({ 
@@ -78,7 +78,7 @@ export const ActiveJobsList = ({
           {errorMessage || "Impossible de récupérer les jobs actifs. Le serveur backend n'est pas accessible."}
         </p>
         <p className="text-slate-500 text-xs mt-2">
-          💡 Les fichiers uploadés sont sauvegardés dans MongoDB et restent accessibles.
+          💡 Vérifiez que le serveur backend Django est démarré et accessible.
         </p>
       </div>
     );

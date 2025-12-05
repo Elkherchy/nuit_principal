@@ -40,9 +40,6 @@ export interface StartRecordingResponse {
   process_id?: number;
   output_path?: string;
   message?: string;
-  mongo_file_id?: string;
-  mongo_url?: string;
-  local_url?: string;
   warning?: string;
 }
 
@@ -90,6 +87,7 @@ export interface RecordingDetails extends Recording {
   };
   transcript?: string;
   summary?: string;
+  keywords?: string[]; // Mots-clés extraits par l'IA
   ai_metadata?: unknown;
   owner?: unknown;
   updated_at?: string;
@@ -115,45 +113,33 @@ export interface Statistics {
 }
 
 /**
- * Démarre un nouvel enregistrement
+ * Démarre un nouvel enregistrement depuis une URL de stream
+ * SANS upload de fichier - utilise uniquement des URLs
  */
 export const startRecording = async (
   params: StartRecordingParams
 ): Promise<StartRecordingResponse> => {
-  // Si la source est un fichier, on utilise la route locale Next.js pour l'upload
-  if (params.source instanceof File) {
-    const formData = new FormData();
-    formData.append("audio_file", params.source);
-    formData.append("title", params.title);
-    formData.append("format", params.format);
-    formData.append("duration", params.duration.toString());
-
-    // Utiliser la route API locale Next.js au lieu du serveur externe
-    const endpoint = "/api/recordings/upload";
-    const response = await fetch(endpoint, {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const errorData = await response
-        .json()
-        .catch(() => ({ message: "Erreur inconnue" }));
-      throw new Error(errorData.message || `Erreur HTTP ${response.status}`);
-    }
-
-    return response.json();
-  }
-
-  // Sinon, on utilise l'ancienne méthode avec URL (serveur externe)
-  const endpoint = `${API_BASE}/api/recordings/jobs/start/`;
+  // Utiliser la route API locale Next.js (qui proxy vers le backend Django)
+  const endpoint = "/api/recordings/upload";
   const response = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(params),
+    body: JSON.stringify({
+      source: params.source, // URL du stream
+      title: params.title,
+      format: params.format,
+      duration: params.duration,
+    }),
   });
 
-  return handleResponse(response, endpoint);
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ message: "Erreur inconnue" }));
+    throw new Error(errorData.message || `Erreur HTTP ${response.status}`);
+  }
+
+  return response.json();
 };
 
 /**
@@ -373,4 +359,146 @@ export const fetchStatistics = async (): Promise<Statistics> => {
  */
 export const getDownloadUrl = (recordingId: number): string => {
   return `${API_BASE}/api/archive/recordings/${recordingId}/download/`;
+};
+
+/**
+ * Transcrit un enregistrement audio en texte
+ */
+export const transcribeRecording = async (
+  recordingId: number,
+  language = "fr"
+): Promise<{ success: boolean; transcript?: string; language?: string; message?: string }> => {
+  const endpoint = "/api/ai/transcribe";
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      recording_id: recordingId,
+      language,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ message: "Erreur inconnue" }));
+    throw new Error(errorData.message || `Erreur HTTP ${response.status}`);
+  }
+
+  return response.json();
+};
+
+/**
+ * Extrait les mots-clés d'un enregistrement
+ */
+export const extractKeywords = async (
+  recordingId: number,
+  maxKeywords = 10
+): Promise<{ success: boolean; keywords?: string[]; message?: string }> => {
+  const endpoint = "/api/ai/extract-keywords";
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      recording_id: recordingId,
+      max_keywords: maxKeywords,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ message: "Erreur inconnue" }));
+    throw new Error(errorData.message || `Erreur HTTP ${response.status}`);
+  }
+
+  return response.json();
+};
+
+/**
+ * Récupère les informations sur les modèles IA disponibles
+ */
+export const getModelsInfo = async (): Promise<{
+  success: boolean;
+  whisper?: { available: boolean; message: string };
+  mistral?: {
+    model?: string;
+    provider?: string;
+    api_key_configured?: boolean;
+    available?: boolean;
+    message?: string;
+  };
+  message?: string;
+}> => {
+  const endpoint = "/api/ai/models-info";
+  const response = await fetch(endpoint, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ message: "Erreur inconnue" }));
+    throw new Error(errorData.message || `Erreur HTTP ${response.status}`);
+  }
+
+  return response.json();
+};
+
+/**
+ * Traite complètement un enregistrement (transcription + résumé)
+ */
+export const processRecording = async (
+  recordingId: number
+): Promise<{
+  success: boolean;
+  transcript?: string;
+  summary?: string;
+  message?: string;
+}> => {
+  // D'abord transcrire
+  const transcriptResult = await transcribeRecording(recordingId);
+  
+  if (!transcriptResult.success) {
+    return {
+      success: false,
+      message: "❌ Échec de la transcription",
+    };
+  }
+
+  // Puis générer le résumé
+  const summaryResult = await generateSummary(recordingId);
+
+  return {
+    success: transcriptResult.success && summaryResult.success,
+    transcript: transcriptResult.transcript,
+    summary: summaryResult.summary,
+    message: "✅ Enregistrement traité avec succès (transcription + résumé)",
+  };
+};
+
+/**
+ * Supprime un enregistrement
+ */
+export const deleteRecording = async (
+  recordingId: number
+): Promise<{ success: boolean; message?: string }> => {
+  const endpoint = "/api/archive/delete";
+  const response = await fetch(endpoint, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      recording_id: recordingId,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ message: "Erreur inconnue" }));
+    throw new Error(errorData.message || `Erreur HTTP ${response.status}`);
+  }
+
+  return response.json();
 };

@@ -1,32 +1,24 @@
 "use client";
 
 import { useEffect } from "react";
-import { Radio, Square, FileAudio, TrendingUp, RefreshCw } from "lucide-react";
+import { Radio, RefreshCw } from "lucide-react";
 import { usePigeRecordings } from "@/hooks/usePigeRecordings";
 import { usePigeStatistics } from "@/hooks/usePigeStatistics";
 import { RecordingForm } from "@/components/pige/RecordingForm";
-import { ActiveJobsList } from "@/components/pige/ActiveJobsList";
-import { RecordingsList } from "@/components/pige/RecordingsList";
-import { RecordingDetails } from "@/components/pige/RecordingDetails";
-import { StatisticsPanel } from "@/components/pige/StatisticsPanel";
+import { PigeTabs } from "@/components/pige/PigeTabs";
 
 export default function PigePage() {
   const {
     loading,
     message,
-    activeJobs,
     recordings,
     selectedRecording,
-    backendError,
     autoRefresh,
     startRecording,
-    fetchActiveJobs,
     fetchRecordings,
     fetchRecordingDetails,
     generateSummary,
-    stopJob,
-    deleteJob,
-    cleanupJobs,
+    deleteRecording,
     toggleAutoRefresh,
   } = usePigeRecordings();
 
@@ -34,7 +26,6 @@ export default function PigePage() {
 
   // Charger les données au démarrage
   useEffect(() => {
-    fetchActiveJobs();
     fetchRecordings();
     fetchStatistics();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -84,71 +75,15 @@ export default function PigePage() {
         message={message}
       />
 
-      {/* Actions rapides */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 relative z-10">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            fetchActiveJobs();
-          }}
-          className="bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-slate-600 text-white font-semibold py-3 px-4 rounded flex items-center justify-center gap-2 cursor-pointer transition-all duration-200 hover:scale-105"
-        >
-          <Square className="h-5 w-5" />
-          Jobs actifs
-        </button>
-
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            fetchRecordings();
-          }}
-          className="bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-slate-600 text-white font-semibold py-3 px-4 rounded flex items-center justify-center gap-2 cursor-pointer transition-all duration-200 hover:scale-105"
-        >
-          <FileAudio className="h-5 w-5" />
-          Enregistrements
-        </button>
-
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            fetchStatistics();
-          }}
-          className="bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-slate-600 text-white font-semibold py-3 px-4 rounded flex items-center justify-center gap-2 cursor-pointer transition-all duration-200 hover:scale-105"
-        >
-          <TrendingUp className="h-5 w-5" />
-          Statistiques
-        </button>
-      </div>
-
-      {/* Jobs actifs */}
-      <ActiveJobsList 
-        jobs={activeJobs} 
-        error={backendError}
-        errorMessage={backendError ? "Le serveur backend n'est pas accessible. Les fichiers uploadés restent sauvegardés dans MongoDB." : undefined}
-        onStopJob={stopJob}
-        onDeleteJob={deleteJob}
-        onCleanupJobs={cleanupJobs}
-      />
-
-      {/* Liste des enregistrements */}
-      <RecordingsList
+      {/* Interface à onglets avec cartes */}
+      <PigeTabs
         recordings={recordings}
+        selectedRecording={selectedRecording}
+        statistics={statistics}
         onSelectRecording={fetchRecordingDetails}
+        onGenerateSummary={generateSummary}
+        onDeleteRecording={deleteRecording}
       />
-
-      {/* Détails de l'enregistrement sélectionné */}
-      {selectedRecording && (
-        <RecordingDetails
-          recording={selectedRecording}
-          onGenerateSummary={generateSummary}
-        />
-      )}
-
-      {/* Statistiques */}
-      <StatisticsPanel statistics={statistics} />
     </div>
   );
 }

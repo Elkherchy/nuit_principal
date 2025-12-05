@@ -4,25 +4,33 @@
 
 "use client";
 
-import { FileAudio, CheckCircle, AlertCircle, Download, Sparkles, FileText } from "lucide-react";
+import { useState } from "react";
+import { FileAudio, CheckCircle, AlertCircle, Download, Sparkles, FileText, Trash2 } from "lucide-react";
 import type { Recording } from "@/services/pigeService";
 import { getDownloadUrl } from "@/services/pigeService";
 
 interface RecordingsListProps {
   recordings: Recording[];
   onSelectRecording: (id: number) => void;
+  onDeleteRecording?: (id: number) => Promise<{ success: boolean; message?: string }>;
+  showHeader?: boolean; // Afficher ou masquer l'en-tête
 }
 
 export const RecordingsList = ({
   recordings,
   onSelectRecording,
+  onDeleteRecording,
+  showHeader = true,
 }: RecordingsListProps) => {
+  const [deletingIds, setDeletingIds] = useState<number[]>([]);
   return (
-    <div className="bg-slate-900 border border-slate-700 rounded-lg p-6">
-      <h2 className="text-2xl font-semibold text-emerald-300 mb-4 flex items-center gap-2">
-        <FileAudio className="h-6 w-6" />
-        Enregistrements ({recordings.length})
-      </h2>
+    <div className={showHeader ? "bg-slate-900 border border-slate-700 rounded-lg p-6" : ""}>
+      {showHeader && (
+        <h2 className="text-2xl font-semibold text-emerald-300 mb-4 flex items-center gap-2">
+          <FileAudio className="h-6 w-6" />
+          Enregistrements ({recordings.length})
+        </h2>
+      )}
       
       {recordings.length === 0 ? (
         <div className="text-center py-8">
@@ -81,11 +89,38 @@ export const RecordingsList = ({
                   href={getDownloadUrl(rec.id)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-2 bg-emerald-600 hover:bg-emerald-700 rounded"
+                  className="p-2 bg-emerald-600 hover:bg-emerald-700 rounded transition-colors"
                   onClick={(e) => e.stopPropagation()}
+                  title="Télécharger"
                 >
                   <Download className="h-4 w-4" />
                 </a>
+                {onDeleteRecording && (
+                  <button
+                    type="button"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (!confirm(`Êtes-vous sûr de vouloir supprimer "${rec.title}" ?\n\nCette action est irréversible.`)) {
+                        return;
+                      }
+                      setDeletingIds((prev) => [...prev, rec.id]);
+                      try {
+                        await onDeleteRecording(rec.id);
+                      } finally {
+                        setDeletingIds((prev) => prev.filter((id) => id !== rec.id));
+                      }
+                    }}
+                    disabled={deletingIds.includes(rec.id)}
+                    className="p-2 bg-red-600 hover:bg-red-700 disabled:bg-slate-700 disabled:cursor-not-allowed rounded transition-colors"
+                    title="Supprimer"
+                  >
+                    {deletingIds.includes(rec.id) ? (
+                      <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           </div>

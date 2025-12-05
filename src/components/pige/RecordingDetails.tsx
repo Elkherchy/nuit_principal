@@ -11,7 +11,7 @@ import { formatBytes } from "@/lib/pigeFormatters";
 
 interface RecordingDetailsProps {
   recording: RecordingDetailsType;
-  onGenerateSummary: (id: number) => void;
+  onGenerateSummary: (id: number) => Promise<{ success: boolean; summary?: string; message?: string }>;
 }
 
 export const RecordingDetails = ({
@@ -60,12 +60,25 @@ export const RecordingDetails = ({
       {/* Section Transcription */}
       {recording.transcript && (
         <div className="bg-slate-800 border border-slate-700 p-5 rounded-lg mb-4">
-          <h3 className="font-semibold text-emerald-300 mb-3 text-lg">📝 Transcription complète</h3>
-          <div className="bg-slate-900/50 p-4 rounded-lg max-h-96 overflow-y-auto">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-emerald-300 text-lg">📝 Transcription complète</h3>
+            {recording.transcript.length > 500 && (
+              <span className="text-xs text-slate-500 px-2 py-1 bg-slate-700 rounded">
+                {recording.transcript.length} caractères
+              </span>
+            )}
+          </div>
+          <div className="bg-slate-900/50 p-4 rounded-lg max-h-96 overflow-y-auto custom-scrollbar">
             <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">
               {recording.transcript}
             </p>
           </div>
+          {recording.transcript.length > 1000 && (
+            <p className="text-xs text-slate-500 mt-2 flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" />
+              Texte long - utilisez la molette pour faire défiler
+            </p>
+          )}
         </div>
       )}
 
@@ -83,10 +96,38 @@ export const RecordingDetails = ({
             <h3 className="font-semibold text-blue-300 text-lg">Résumé IA</h3>
           </div>
 
-          <div className="bg-slate-900/50 p-4 rounded-lg mb-3 backdrop-blur-sm">
-            <p className="text-slate-200 leading-relaxed whitespace-pre-wrap">
-              {recording.summary}
-            </p>
+          {/* Afficher le résumé ou la transcription si trop court */}
+          <div className="bg-slate-900/50 p-4 rounded-lg mb-3 backdrop-blur-sm max-h-96 overflow-y-auto custom-scrollbar">
+            {recording.summary.toLowerCase().includes("trop court") || 
+             recording.summary.toLowerCase().includes("insufficient") ? (
+              /* Si trop court, afficher la transcription comme résumé */
+              recording.transcript ? (
+                <div>
+                  <p className="text-slate-200 leading-relaxed italic">
+                    &quot;{recording.transcript}&quot;
+                  </p>
+                  <p className="text-xs text-slate-500 mt-3 pt-3 border-t border-slate-700">
+                    📝 Texte court ({recording.transcript.length} caractères)
+                  </p>
+                </div>
+              ) : (
+                <p className="text-slate-400 italic text-sm">
+                  Aucun contenu disponible pour générer un résumé.
+                </p>
+              )
+            ) : (
+              /* Résumé normal */
+              <div>
+                <p className="text-slate-200 leading-relaxed whitespace-pre-wrap">
+                  {recording.summary}
+                </p>
+                {recording.summary.length > 500 && (
+                  <p className="text-xs text-slate-500 mt-3 pt-3 border-t border-slate-700">
+                    📊 Longueur: {recording.summary.length} caractères
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Bouton de régénération */}

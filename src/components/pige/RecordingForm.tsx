@@ -1,11 +1,11 @@
 /**
- * Formulaire pour démarrer un enregistrement
+ * Formulaire pour démarrer un enregistrement depuis une URL de stream
  */
 
 "use client";
 
 import { useState } from "react";
-import { Play, Upload } from "lucide-react";
+import { Play, Radio } from "lucide-react";
 import type { StartRecordingParams, StartRecordingResponse } from "@/services/pigeService";
 
 interface RecordingFormProps {
@@ -15,76 +15,67 @@ interface RecordingFormProps {
 }
 
 export const RecordingForm = ({ onSubmit, loading, message }: RecordingFormProps) => {
-  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [streamUrl, setStreamUrl] = useState("");
   const [title, setTitle] = useState("");
   const [duration, setDuration] = useState(30);
   const [format, setFormat] = useState("mp3");
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setAudioFile(file);
-      // Extraire le nom du fichier sans extension comme titre par défaut
-      if (!title) {
-        const fileName = file.name.replace(/\.[^/.]+$/, "");
-        setTitle(fileName);
-      }
-    }
-  };
-
   const handleSubmit = async () => {
-    if (!audioFile) {
-      alert("Veuillez sélectionner un fichier audio");
+    if (!streamUrl) {
+      alert("Veuillez entrer une URL de stream radio");
+      return;
+    }
+
+    if (!title) {
+      alert("Veuillez entrer un titre pour l'enregistrement");
       return;
     }
 
     await onSubmit({
-      source: audioFile,
+      source: streamUrl, // URL au lieu de File
       title,
       format,
       duration,
     });
+    
+    // Réinitialiser uniquement le titre et la durée
     setTitle("");
-    setAudioFile(null);
+    setDuration(30);
   };
 
   return (
     <div className="bg-slate-900 border border-slate-700 rounded-lg p-6 space-y-4">
       <h2 className="text-2xl font-semibold text-emerald-300 flex items-center gap-2">
-        <Play className="h-6 w-6" />
-        Démarrer un enregistrement
+        <Radio className="h-6 w-6" />
+        Enregistrer un Stream Radio
       </h2>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-slate-300 mb-2">
-            Fichier Audio
+            URL du Stream Radio <span className="text-red-400">*</span>
           </label>
-          <div className="relative">
-            <input
-              type="file"
-              accept="audio/*,.mp3,.wav,.flac,.m4a,.aac,.ogg"
-              onChange={handleFileChange}
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded text-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 file:cursor-pointer"
-            />
-            {audioFile && (
-              <div className="mt-2 flex items-center gap-2 text-sm text-emerald-400">
-                <Upload className="h-4 w-4" />
-                <span>{audioFile.name} ({(audioFile.size / 1024 / 1024).toFixed(2)} MB)</span>
-              </div>
-            )}
-          </div>
+          <input
+            type="url"
+            value={streamUrl}
+            onChange={(e) => setStreamUrl(e.target.value)}
+            className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
+            placeholder="Ex: http://icecast.radiofrance.fr/franceinter-midfi.mp3"
+          />
+          <p className="text-xs text-slate-500 mt-1">
+            💡 Exemple: http://stream.example.com/radio.mp3
+          </p>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-slate-300 mb-2">
-            Titre de l&rsquo;émission
+            Titre de l&apos;émission <span className="text-red-400">*</span>
           </label>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded text-white"
+            className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
             placeholder="Ex: Émission matinale"
           />
         </div>
@@ -97,9 +88,13 @@ export const RecordingForm = ({ onSubmit, loading, message }: RecordingFormProps
             type="number"
             value={duration}
             onChange={(e) => setDuration(Number(e.target.value))}
-            className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded text-white"
+            className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded text-white focus:outline-none focus:border-emerald-500 transition-colors"
             min="10"
+            max="3600"
           />
+          <p className="text-xs text-slate-500 mt-1">
+            De 10 secondes à 1 heure (3600s)
+          </p>
         </div>
 
         <div>
@@ -109,29 +104,31 @@ export const RecordingForm = ({ onSubmit, loading, message }: RecordingFormProps
           <select
             value={format}
             onChange={(e) => setFormat(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded text-white"
+            className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded text-white focus:outline-none focus:border-emerald-500 transition-colors"
           >
             <option value="mp3">MP3</option>
             <option value="wav">WAV</option>
             <option value="flac">FLAC</option>
+            <option value="aac">AAC</option>
+            <option value="ogg">OGG</option>
           </select>
         </div>
       </div>
 
       <button
         onClick={handleSubmit}
-        disabled={loading}
-        className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-700 text-white font-semibold py-3 px-4 rounded flex items-center justify-center gap-2"
+        disabled={loading || !streamUrl || !title}
+        className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded flex items-center justify-center gap-2 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] disabled:hover:scale-100"
       >
         {loading ? (
           <>
             <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full" />
-            Démarrage en cours...
+            Démarrage de l&apos;enregistrement...
           </>
         ) : (
           <>
             <Play className="h-5 w-5" />
-            Démarrer l&rsquo;enregistrement
+            Démarrer l&apos;enregistrement
           </>
         )}
       </button>
@@ -140,14 +137,31 @@ export const RecordingForm = ({ onSubmit, loading, message }: RecordingFormProps
         <div
           className={`p-3 rounded ${
             message.includes("✅")
-              ? "bg-emerald-900/30 border border-emerald-700"
-              : "bg-red-900/30 border border-red-700"
+              ? "bg-emerald-900/30 border border-emerald-700 text-emerald-300"
+              : "bg-red-900/30 border border-red-700 text-red-300"
           }`}
         >
           {message}
         </div>
       )}
+
+      {/* Exemples d'URLs */}
+      <details className="text-sm text-slate-400">
+        <summary className="cursor-pointer hover:text-slate-300 transition-colors">
+          📻 Exemples de streams radio français
+        </summary>
+        <ul className="mt-2 space-y-1 pl-4 text-xs">
+          <li className="cursor-pointer hover:text-emerald-400 transition-colors" onClick={() => setStreamUrl("http://icecast.radiofrance.fr/franceinter-midfi.mp3")}>
+            • France Inter: http://icecast.radiofrance.fr/franceinter-midfi.mp3
+          </li>
+          <li className="cursor-pointer hover:text-emerald-400 transition-colors" onClick={() => setStreamUrl("http://icecast.radiofrance.fr/franceinfo-midfi.mp3")}>
+            • France Info: http://icecast.radiofrance.fr/franceinfo-midfi.mp3
+          </li>
+          <li className="cursor-pointer hover:text-emerald-400 transition-colors" onClick={() => setStreamUrl("http://icecast.radiofrance.fr/franceculture-midfi.mp3")}>
+            • France Culture: http://icecast.radiofrance.fr/franceculture-midfi.mp3
+          </li>
+        </ul>
+      </details>
     </div>
   );
 };
-
