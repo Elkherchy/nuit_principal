@@ -2,7 +2,29 @@
  * Service API pour le système de pige radio
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://91.98.158.148";
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "https://pige.siraj-ai.com";
+
+/**
+ * Gère les erreurs de réponse HTTP
+ */
+const handleResponse = async (response: Response, endpoint: string) => {
+  if (!response.ok) {
+    let errorMessage = `Erreur ${response.status} sur ${endpoint}`;
+
+    if (response.status === 404) {
+      errorMessage = `⚠️ Endpoint introuvable (404): ${endpoint}\nVérifiez que le serveur API est démarré et accessible.`;
+    } else if (response.status === 500) {
+      errorMessage = `⚠️ Erreur serveur (500) sur ${endpoint}`;
+    } else if (response.status === 0 || response.status >= 502) {
+      errorMessage = `⚠️ Serveur inaccessible: ${API_BASE}\nVérifiez votre connexion et que le serveur est en ligne.`;
+    }
+
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+};
 
 export interface StartRecordingParams {
   source: string | File;
@@ -92,7 +114,7 @@ export interface Statistics {
 export const startRecording = async (
   params: StartRecordingParams
 ): Promise<StartRecordingResponse> => {
-  // Si la source est un fichier, on utilise FormData pour l'upload
+  // Si la source est un fichier, on utilise la route locale Next.js pour l'upload
   if (params.source instanceof File) {
     const formData = new FormData();
     formData.append("audio_file", params.source);
@@ -100,22 +122,32 @@ export const startRecording = async (
     formData.append("format", params.format);
     formData.append("duration", params.duration.toString());
 
-    const response = await fetch(`${API_BASE}/api/recordings/upload/`, {
+    // Utiliser la route API locale Next.js au lieu du serveur externe
+    const endpoint = "/api/recordings/upload";
+    const response = await fetch(endpoint, {
       method: "POST",
       body: formData,
     });
 
+    if (!response.ok) {
+      const errorData = await response
+        .json()
+        .catch(() => ({ message: "Erreur inconnue" }));
+      throw new Error(errorData.message || `Erreur HTTP ${response.status}`);
+    }
+
     return response.json();
   }
 
-  // Sinon, on utilise l'ancienne méthode avec URL
-  const response = await fetch(`${API_BASE}/api/recordings/jobs/start/`, {
+  // Sinon, on utilise l'ancienne méthode avec URL (serveur externe)
+  const endpoint = `${API_BASE}/api/recordings/jobs/start/`;
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(params),
   });
 
-  return response.json();
+  return handleResponse(response, endpoint);
 };
 
 /**
@@ -126,6 +158,14 @@ export const fetchActiveJobs = async (): Promise<{
   jobs: ActiveJob[];
 }> => {
   const response = await fetch(`${API_BASE}/api/recordings/jobs/active/`);
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(
+      `Erreur HTTP ${response.status}: ${text.substring(0, 100)}`
+    );
+  }
+
   return response.json();
 };
 
@@ -137,6 +177,14 @@ export const fetchRecordings = async (): Promise<{
   results: Recording[];
 }> => {
   const response = await fetch(`${API_BASE}/api/archive/recordings/`);
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(
+      `Erreur HTTP ${response.status}: ${text.substring(0, 100)}`
+    );
+  }
+
   return response.json();
 };
 
@@ -147,6 +195,14 @@ export const fetchRecordingDetails = async (
   id: number
 ): Promise<RecordingDetails> => {
   const response = await fetch(`${API_BASE}/api/archive/recordings/${id}/`);
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(
+      `Erreur HTTP ${response.status}: ${text.substring(0, 100)}`
+    );
+  }
+
   return response.json();
 };
 
@@ -166,6 +222,13 @@ export const generateSummary = async (
     }),
   });
 
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(
+      `Erreur HTTP ${response.status}: ${text.substring(0, 100)}`
+    );
+  }
+
   return response.json();
 };
 
@@ -176,6 +239,14 @@ export const fetchStatistics = async (): Promise<Statistics> => {
   const response = await fetch(
     `${API_BASE}/api/archive/recordings/statistics/`
   );
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(
+      `Erreur HTTP ${response.status}: ${text.substring(0, 100)}`
+    );
+  }
+
   return response.json();
 };
 

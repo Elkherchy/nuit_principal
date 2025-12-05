@@ -8,7 +8,7 @@ Le fichier `.env.local` contient les variables d'environnement pour la connexion
 
 ```bash
 # Configuration API Système de Pige Radio
-NEXT_PUBLIC_API_BASE_URL=http://91.98.158.148
+NEXT_PUBLIC_API_BASE_URL=https://pige.siraj-ai.com
 ```
 
 ### Configuration
@@ -27,7 +27,7 @@ NEXT_PUBLIC_API_BASE_URL=http://91.98.158.148
 La variable est utilisée dans `/src/app/pige/page.tsx` :
 
 ```typescript
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://91.98.158.148";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "https://pige.siraj-ai.com";
 ```
 
 ### Notes importantes
@@ -55,7 +55,7 @@ Pour gérer plusieurs environnements :
 ### Développement
 ```bash
 # .env.local
-NEXT_PUBLIC_API_BASE_URL=http://91.98.158.148
+NEXT_PUBLIC_API_BASE_URL=https://pige.siraj-ai.com
 ```
 
 ### Production

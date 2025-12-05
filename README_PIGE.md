@@ -140,7 +140,7 @@ Page principale qui orchestre tout :
 
 Créez `.env.local` :
 ```bash
-NEXT_PUBLIC_API_BASE_URL=http://91.98.158.148
+NEXT_PUBLIC_API_BASE_URL=https://pige.siraj-ai.com
 ```
 
 ### 2. Dépendances

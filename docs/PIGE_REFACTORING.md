@@ -200,7 +200,7 @@ function MyStats() {
 ### Variables d'environnement
 ```bash
 # .env.local
-NEXT_PUBLIC_API_BASE_URL=http://91.98.158.148
+NEXT_PUBLIC_API_BASE_URL=https://pige.siraj-ai.com
 ```
 
 ### Import des composants

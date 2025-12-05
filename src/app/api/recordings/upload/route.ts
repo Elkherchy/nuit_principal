@@ -3,7 +3,8 @@ import { writeFile, mkdir } from "fs/promises";
 import { existsSync } from "fs";
 import path from "path";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://91.98.158.148";
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "https://pige.siraj-ai.com";
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,18 +49,39 @@ export async function POST(request: NextRequest) {
     backendFormData.append("local_path", publicUrl);
 
     // Appeler l'API backend pour traiter l'enregistrement
-    const backendResponse = await fetch(`${API_BASE}/api/recordings/upload/`, {
-      method: "POST",
-      body: backendFormData,
-    });
+    try {
+      const backendResponse = await fetch(
+        `${API_BASE}/api/recordings/upload/`,
+        {
+          method: "POST",
+          body: backendFormData,
+        }
+      );
 
-    const backendData = await backendResponse.json();
+      // Si le backend est accessible et répond
+      if (backendResponse.ok) {
+        const backendData = await backendResponse.json();
+        return NextResponse.json({
+          success: true,
+          ...backendData,
+          local_url: publicUrl,
+          message: `✅ Fichier "${audioFile.name}" uploadé avec succès`,
+        });
+      }
 
+      // Si le backend retourne une erreur
+      console.warn(`Backend API non disponible (${backendResponse.status})`);
+    } catch (backendError) {
+      console.warn("Backend API non accessible:", backendError);
+    }
+
+    // Fallback: fichier sauvegardé localement même si le backend n'est pas accessible
     return NextResponse.json({
       success: true,
-      ...backendData,
       local_url: publicUrl,
-      message: `✅ Fichier "${audioFile.name}" uploadé avec succès`,
+      message: `✅ Fichier "${audioFile.name}" sauvegardé localement (backend non disponible)`,
+      warning:
+        "Le serveur de traitement audio n'est pas accessible. Le fichier est sauvegardé localement.",
     });
   } catch (error) {
     console.error("Erreur lors de l'upload:", error);
@@ -74,4 +96,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
